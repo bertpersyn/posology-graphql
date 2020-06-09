@@ -1,0 +1,44 @@
+# GraphQL schema example
+#
+# https://gqlgen.com/getting-started/
+
+
+type Medicine {
+  code: ID!
+  name: String!
+  ingredient: Ingredient!
+  posologyNotes: [String!]
+}
+
+type Ingredient {
+  pharmaceuticalForm: PharmaceuticalForm!
+  from: Time!
+  substance: Substance!
+  strength: Strength!
+}
+
+type Strength {
+  unit: String!
+  value: Float!
+}
+type Substance {
+  code: ID!
+  name: String!
+}
+type PharmaceuticalForm {
+  code: ID!
+  name: String!
+}
+
+type Query {
+  medicines: [Medicine!]!
+  substances: [Substance!]!
+  search(filter: Filter) : [Medicine!]
+}
+
+input Filter {
+  name: String
+  substance: String
+}
+
+scalar Time

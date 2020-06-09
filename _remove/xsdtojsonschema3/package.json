@@ -1,0 +1,8 @@
+{
+    "name": "xsd-to-json-schema",
+    "version": "1.0.0",
+    "dependencies": {
+        "xsd2jsonschema": "^0.3.4",
+        "yargs": "^15.3.1"
+    }
+  }

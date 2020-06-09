@@ -1,0 +1,11 @@
+{
+    "name": "jsonix-schema-compiler",
+    "version": "0.0.0",
+    "description": "",
+    "dependencies": {
+      "jsonix": "^3.0.0"
+    },
+    "devDependencies": {},
+    "author": "Daniel James",
+    "license": "MIT"
+  }

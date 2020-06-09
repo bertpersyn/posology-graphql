@@ -1,0 +1,8 @@
+{
+    "name": "xml-to-json",
+    "version": "1.0.0",
+    "dependencies": {
+        "jsonix": "~3.0.0",
+        "canonicaljson": "^1.0.1"
+    }
+  }
