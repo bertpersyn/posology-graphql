@@ -40,7 +40,7 @@ if (argv._.includes('convert')) {
                 schemas: {xsdName: data.toString()}
             });
 
-            const jsonSchema = convertedSchemas[xsdName].get();
+            const jsonSchema = convertedSchemas[xsdName].getJsonSchema();
             console.log(JSON.stringify(jsonSchema, null, 2));
           });
       })
