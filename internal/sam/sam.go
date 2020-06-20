@@ -2,6 +2,7 @@ package samparser
 
 import (
 	"fmt"
+	vmpparser "github.com/bertpersyn/posology-graphql/internal/sam/parser/vmp"
 	"os"
 	"sync"
 
@@ -18,8 +19,10 @@ type Service struct {
 
 	refParser     *refparser.Parser
 	ampParser     *ampparser.Parser
+	vmpParser     *vmpparser.Parser
 	refParserFile *os.File
 	ampParserFile *os.File
+	vmpParserFile *os.File
 }
 
 func New() (*Service, error) {
@@ -34,6 +37,10 @@ func New() (*Service, error) {
 		return s, err
 	}
 	err = s.initAmpParser()
+	if err != nil {
+		return s, err
+	}
+	err = s.initVmpParser()
 	if err != nil {
 		return s, err
 	}
@@ -66,6 +73,19 @@ func (s *Service) initAmpParser() error {
 	return nil
 }
 
+func (s *Service) initVmpParser() error {
+	xmlFile, err := os.Open(s.cfg.XML.VmpPath)
+	if err != nil {
+		return fmt.Errorf("could not open vmp ref path: %v", err)
+	}
+	s.vmpParser, err = vmpparser.New(xmlFile)
+	if err != nil {
+		return fmt.Errorf("could not create vmp parser: %v", err)
+	}
+	s.vmpParserFile = xmlFile
+	return nil
+}
+
 func (s *Service) ParseAll() error {
 	defer func() {
 		err := s.ampParserFile.Close()
@@ -78,7 +98,7 @@ func (s *Service) ParseAll() error {
 		}
 	}()
 	wg := sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(3)
 	errChan := make(chan error)
 	wgDoneChan := make(chan bool)
 
@@ -91,6 +111,12 @@ func (s *Service) ParseAll() error {
 	go func() {
 		logrus.Debugf("start parsing amps")
 		errChan <- s.ampParser.Parse()
+		wg.Done()
+	}()
+
+	go func() {
+		logrus.Debugf("start parsing vmps")
+		errChan <- s.vmpParser.Parse()
 		wg.Done()
 	}()
 
@@ -122,4 +148,8 @@ func (s *Service) GetPharmaceuticalForms() map[string]*types.PharmaceuticalForm 
 
 func (s *Service) GetActualMedicinalProducts() map[string]*types.ActualMedicinalProduct {
 	return s.ampParser.ActualMedicinalProducts
+}
+
+func (s *Service) GetVmpPosologyNotes() map[int]string {
+	return s.vmpParser.VmpPosologyNote
 }

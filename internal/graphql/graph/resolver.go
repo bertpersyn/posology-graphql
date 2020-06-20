@@ -2,7 +2,8 @@ package graph
 
 import (
 	"github.com/bertpersyn/posology-graphql/internal/graphql/graph/model"
-	"github.com/bertpersyn/posology-graphql/internal/sam/types"
+	"github.com/bertpersyn/posology-graphql/internal/posology"
+	samparser "github.com/bertpersyn/posology-graphql/internal/sam"
 )
 
 // This file will not be regenerated automatically.
@@ -11,20 +12,17 @@ import (
 //go:generate go run github.com/99designs/gqlgen
 
 type Resolver struct {
-	Sam struct {
-		PharmaceuticalForms map[string]*types.PharmaceuticalForm
-		Substances          map[string]*types.Substance
-		Medicines           map[string]*types.ActualMedicinalProduct
-	}
+	Sam                 *samparser.Service
+	Posology            *posology.Posology
 	Substances          []*model.Substance
 	Medicines           []*model.Medicine
 	PharmaceuticalForms []*model.PharmaceuticalForm
 }
 
 func (r *Resolver) Init() {
-	s := make([]*model.Substance, len(r.Sam.Substances))
+	s := make([]*model.Substance, len(r.Sam.GetSubstances()))
 	i := 0
-	for _, v := range r.Sam.Substances {
+	for _, v := range r.Sam.GetSubstances() {
 		s[i] = &model.Substance{
 			Name: v.Name,
 			Code: v.Code,
@@ -33,21 +31,25 @@ func (r *Resolver) Init() {
 	}
 	r.Substances = s
 
-	m := make([]*model.Medicine, len(r.Sam.Medicines))
+	m := make([]*model.Medicine, len(r.Sam.GetActualMedicinalProducts()))
 	i = 0
-	for _, v := range r.Sam.Medicines {
+	for _, v := range r.Sam.GetActualMedicinalProducts() {
+		//posologyNote := ""
+		//if note, found :=  r.Sam.GetVmpPosologyNotes()[v.VmpCode]; found {
+		//	posologyNote = note
+		//}
 		m[i] = &model.Medicine{
-			Code:          v.Code,
-			Name:          v.OfficialName,
-			PosologyNotes: v.Ampp.PosologyNotes,
+			Code: v.Code,
+			Name: v.OfficialName,
+			//PosologyNote : &posologyNote,
 			Ingredient: &model.Ingredient{
 				From: v.AmpComponent.RealActualIngredient.From,
 				PharmaceuticalForm: &model.PharmaceuticalForm{
-					Name: r.Sam.PharmaceuticalForms[v.AmpComponent.PharmaceuticalFormCode].Name,
+					Name: r.Sam.GetPharmaceuticalForms()[v.AmpComponent.PharmaceuticalFormCode].Name,
 					Code: v.AmpComponent.PharmaceuticalFormCode,
 				},
 				Substance: &model.Substance{
-					Name: r.Sam.Substances[v.AmpComponent.RealActualIngredient.SubstanceCode].Name,
+					Name: r.Sam.GetSubstances()[v.AmpComponent.RealActualIngredient.SubstanceCode].Name,
 					Code: v.AmpComponent.RealActualIngredient.SubstanceCode,
 				},
 				Strength: &model.Strength{
@@ -62,9 +64,9 @@ func (r *Resolver) Init() {
 }
 
 func (r *Resolver) parsePFs() {
-	s := make([]*model.PharmaceuticalForm, len(r.Sam.PharmaceuticalForms))
+	s := make([]*model.PharmaceuticalForm, len(r.Sam.GetPharmaceuticalForms()))
 	i := 0
-	for _, v := range r.Sam.PharmaceuticalForms {
+	for _, v := range r.Sam.GetPharmaceuticalForms() {
 		s[i] = &model.PharmaceuticalForm{
 			Name: v.Name,
 			Code: v.Code,
@@ -72,4 +74,12 @@ func (r *Resolver) parsePFs() {
 		i++
 	}
 	r.PharmaceuticalForms = s
+}
+
+func (r *Resolver) calcReqToMap(calcRequest []*model.CalcArg) map[string]interface{} {
+	m := map[string]interface{}{}
+	for _, calcRequest := range calcRequest {
+		m[calcRequest.Name] = calcRequest.Value
+	}
+	return m
 }

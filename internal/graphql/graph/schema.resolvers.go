@@ -5,7 +5,8 @@ package graph
 
 import (
 	"context"
-	"regexp"
+	"fmt"
+	"strings"
 
 	"github.com/bertpersyn/posology-graphql/internal/graphql/graph/generated"
 	"github.com/bertpersyn/posology-graphql/internal/graphql/graph/model"
@@ -19,27 +20,43 @@ func (r *queryResolver) Substances(ctx context.Context) ([]*model.Substance, err
 	return r.Resolver.Substances, nil
 }
 
-func (r *queryResolver) Search(ctx context.Context, filter *model.Filter) ([]*model.Medicine, error) {
-	nameRegex := new(regexp.Regexp)
-	if filter.Name == nil {
-		nameRegex = regexp.MustCompile(`.*`)
-	} else {
-		nameRegex = regexp.MustCompile(*filter.Name)
-	}
-	substanceRegex := new(regexp.Regexp)
-	if filter.Substance == nil {
-		substanceRegex = regexp.MustCompile(`.*`)
-	} else {
-		substanceRegex = regexp.MustCompile(*filter.Substance)
-	}
+func (r *queryResolver) Search(ctx context.Context, searchTerm string) ([]*model.Medicine, error) {
 	result := []*model.Medicine{}
 	for _, m := range r.Resolver.Medicines {
-		if nameRegex.MatchString(m.Name) && substanceRegex.MatchString(m.Ingredient.Substance.Name) {
+		if strings.HasPrefix(strings.ToLower(m.Name), strings.ToLower(searchTerm)) || strings.HasPrefix(strings.ToLower(m.Ingredient.Substance.Name), strings.ToLower(searchTerm)) {
 			result = append(result, m)
 		}
 	}
 
 	return result, nil
+}
+
+func (r *queryResolver) Posology(ctx context.Context, medicineCode string, calcRequest []*model.CalcArg) (*model.Posology, error) {
+	medicine, found := r.Resolver.Sam.GetActualMedicinalProducts()[medicineCode]
+	if !found {
+		return nil, fmt.Errorf("medicine %v unknown", medicineCode)
+	}
+	found, dosage, err := r.Resolver.Posology.GetDosage(medicine, r.calcReqToMap(calcRequest))
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, fmt.Errorf("posology for %v not available", medicineCode)
+	}
+
+	return &model.Posology{
+		Note: "",
+		Dosage: &model.Dosage{
+			Period: &model.Period{
+				Value: dosage.Period.Value,
+				Cron:  dosage.Period.Cron,
+			},
+			Strength: &model.Strength{
+				Value: dosage.Strength.Value,
+				Unit:  dosage.Strength.Unit,
+			},
+		},
+	}, nil
 }
 
 // Query returns generated.QueryResolver implementation.

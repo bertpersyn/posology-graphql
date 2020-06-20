@@ -33,6 +33,8 @@ func (p *Parser) Parse() error {
 		var err error
 		if strVmpCode, exists := xml.Attrs[parser.AVmpCode]; exists {
 			vmpCode, err = strconv.Atoi(strVmpCode)
+		} else {
+			continue
 		}
 		if err != nil {
 			return err
@@ -84,8 +86,9 @@ func (p *Parser) parseAmpComponents(xml *xmlparser.XMLElement, amp *types.Actual
 
 	ampComponentDataElement := p.find(ampComponentElement, parser.Data)
 	amp.AmpComponent = types.AmpComponent{
-		VmpComponentCode:       vmpComponentCode,
-		PharmaceuticalFormCode: ampComponentDataElement.Childs[parser.PharmaceuticalForm][0].Attrs[parser.ACode],
+		VmpComponentCode:          vmpComponentCode,
+		PharmaceuticalFormCode:    ampComponentDataElement.Childs[parser.PharmaceuticalForm][0].Attrs[parser.ACode],
+		RouteOfAdministrationCode: ampComponentDataElement.Childs[parser.RouteOfAdministration][0].Attrs[parser.ACode],
 	}
 	realActualIngredientElement, err := ampComponentElement.SelectElement(parser.RealActualIngredient)
 	if err != nil {
@@ -97,7 +100,6 @@ func (p *Parser) parseAmpComponents(xml *xmlparser.XMLElement, amp *types.Actual
 		return fmt.Errorf("could not parse from, element real actual ingredient  %v", err)
 	}
 	amp.AmpComponent.RealActualIngredient = types.RealActualIngredient{
-
 		From:          from,
 		Type:          realActualIngredientDataElement.Childs[parser.Type][0].InnerText,
 		SubstanceCode: realActualIngredientDataElement.Childs[parser.Substance][0].Attrs[parser.ACode],

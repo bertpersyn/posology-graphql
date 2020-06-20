@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/bertpersyn/posology-graphql/internal/posology"
 	"net/http"
 	"os"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/bertpersyn/posology-graphql/internal/graphql/graph"
 	"github.com/bertpersyn/posology-graphql/internal/graphql/graph/generated"
 	samparser "github.com/bertpersyn/posology-graphql/internal/sam"
+	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 
 	_ "net/http/pprof"
@@ -18,6 +20,10 @@ import (
 var version, gitCommit, application string
 
 const defaultPort = "8080"
+
+//todo: add metrics
+//todo: add config
+//todo: move init code away to service
 
 func main() {
 	_, err := fmt.Println(fmt.Sprintf("application: %v, gitCommit: %v, version: %v", application, gitCommit, version))
@@ -41,13 +47,17 @@ func main() {
 		port = defaultPort
 	}
 
-	r := &graph.Resolver{}
-	r.Sam.Medicines = samParserService.GetActualMedicinalProducts()
-	r.Sam.Substances = samParserService.GetSubstances()
-	r.Sam.PharmaceuticalForms = samParserService.GetPharmaceuticalForms()
+	r := &graph.Resolver{Sam: samParserService, Posology: posology.New()}
 	r.Init()
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: r}))
+	c := cors.New(cors.Options{
+		AllowedOrigins:   []string{"http://localhost:3000"},
+		AllowCredentials: true,
+		// Enable Debugging for testing, consider disabling in production
+		Debug: true,
+	})
+
+	srv := c.Handler(handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: r})))
 
 	http.Handle("/", playground.Handler("GraphQL playground", "/query"))
 	http.Handle("/query", srv)

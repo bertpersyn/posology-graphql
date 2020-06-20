@@ -27,6 +27,9 @@ TARGET ?= final
 build: ## Build the app
 	go build -o $(BIN_OUTPUT_DIR)/$(PACKAGE)$(PACKAGE_EXTENSION) --ldflags=$(LDFLAGS) $(BUILD_FLAGS)
 
+run:
+	$(BIN_OUTPUT_DIR)/$(PACKAGE)$(PACKAGE_EXTENSION)
+
 sam-remove-ns:
 	sed -i s/ns.://g /media/bertp/Data/SAM/2636-2020-06-03-13-21-08/AMP.xml
 	sed -i s/ns.://g /media/bertp/Data/SAM/2636-2020-06-03-13-21-08/REF.xml

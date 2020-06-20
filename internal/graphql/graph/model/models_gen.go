@@ -6,9 +6,14 @@ import (
 	"time"
 )
 
-type Filter struct {
-	Name      *string `json:"name"`
-	Substance *string `json:"substance"`
+type CalcArg struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
+type Dosage struct {
+	Strength *Strength `json:"strength"`
+	Period   *Period   `json:"period"`
 }
 
 type Ingredient struct {
@@ -19,15 +24,24 @@ type Ingredient struct {
 }
 
 type Medicine struct {
-	Code          string      `json:"code"`
-	Name          string      `json:"name"`
-	Ingredient    *Ingredient `json:"ingredient"`
-	PosologyNotes []string    `json:"posologyNotes"`
+	Code       string      `json:"code"`
+	Name       string      `json:"name"`
+	Ingredient *Ingredient `json:"ingredient"`
+}
+
+type Period struct {
+	Value float64 `json:"value"`
+	Cron  string  `json:"cron"`
 }
 
 type PharmaceuticalForm struct {
 	Code string `json:"code"`
 	Name string `json:"name"`
+}
+
+type Posology struct {
+	Note   string  `json:"note"`
+	Dosage *Dosage `json:"dosage"`
 }
 
 type Strength struct {

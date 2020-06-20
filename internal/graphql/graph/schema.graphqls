@@ -7,7 +7,6 @@ type Medicine {
   code: ID!
   name: String!
   ingredient: Ingredient!
-  posologyNotes: [String!]
 }
 
 type Ingredient {
@@ -30,15 +29,31 @@ type PharmaceuticalForm {
   name: String!
 }
 
+type Dosage {
+  strength: Strength!
+  period: Period!
+}
+
+type Period {
+  value: Float!
+  cron: String!
+}
+
+type Posology {
+  note: String!
+  dosage: Dosage!
+}
+
+input CalcArg {
+  name: String!
+  value: String!
+}
+
 type Query {
   medicines: [Medicine!]!
   substances: [Substance!]!
-  search(filter: Filter) : [Medicine!]
-}
-
-input Filter {
-  name: String
-  substance: String
+  search(searchTerm: String!) : [Medicine!]
+  posology(medicineCode: String!, calcRequest: [CalcArg!]!) : Posology
 }
 
 scalar Time

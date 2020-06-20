@@ -2,9 +2,8 @@ package refparser
 
 import (
 	"bufio"
-	"io"
-
 	"github.com/bertpersyn/posology-graphql/internal/sam/parser"
+	"io"
 
 	types "github.com/bertpersyn/posology-graphql/internal/sam/types"
 	xmlparser "github.com/tamerh/xml-stream-parser"

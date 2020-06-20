@@ -9,6 +9,7 @@ type Cfg struct {
 type XML struct {
 	RefPath string `yaml:"RefPath"`
 	AmpPath string `yaml:"AmpPath"`
+	VmpPath string `yaml:"VmpPath"`
 }
 
 type Substance struct {
@@ -22,18 +23,19 @@ type PharmaceuticalForm struct {
 }
 
 type ActualMedicinalProduct struct {
-	OfficialName     string
-	From             time.Time
+	OfficialName string
+	From         time.Time
 	AmpComponent AmpComponent
 	VmpCode      int
 	Code         string
-	Ampp Ampp
+	Ampp         Ampp
 }
 
 type AmpComponent struct {
-	RealActualIngredient   RealActualIngredient
-	PharmaceuticalFormCode string
-	VmpComponentCode       int
+	RealActualIngredient      RealActualIngredient
+	PharmaceuticalFormCode    string
+	RouteOfAdministrationCode string
+	VmpComponentCode          int
 }
 
 type Ampp struct {
@@ -41,10 +43,10 @@ type Ampp struct {
 }
 
 type RealActualIngredient struct {
-	Type                  string
-	Strength              Quantity
-	SubstanceCode         string
-	From                  time.Time
+	Type          string
+	Strength      Quantity
+	SubstanceCode string
+	From          time.Time
 }
 
 type Quantity struct {

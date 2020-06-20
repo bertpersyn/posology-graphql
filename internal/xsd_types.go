@@ -42,7 +42,7 @@ type AddAmpComponentBcpiType struct {
 
 type AddAmpComponentFamhpType struct {
 	PharmaceuticalFormCode    []String10Type                `xml:"urn:be:fgov:ehealth:samws:v2:core PharmaceuticalFormCode"`
-	RouteOfAdministrationCode []String10Type                `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCode"`
+	RouteOfAdministrationCode []String10Type                `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCodes"`
 	RealActualIngredient      []AddRealActualIngredientType `xml:"urn:be:fgov:ehealth:samws:v2:actual:common RealActualIngredient"`
 	SequenceNr                int                           `xml:"sequenceNr,attr"`
 }
@@ -515,7 +515,7 @@ type AddVmpComponentType struct {
 	PhaseNumber               int                        `xml:"urn:be:fgov:ehealth:samws:v2:core PhaseNumber,omitempty"`
 	Name                      Text255Type                `xml:"urn:be:fgov:ehealth:samws:v2:core Name"`
 	VirtualFormCode           String10Type               `xml:"urn:be:fgov:ehealth:samws:v2:core VirtualFormCode"`
-	RouteOfAdministrationCode []String10Type             `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCode"`
+	RouteOfAdministrationCode []String10Type             `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCodes"`
 	Code                      int                        `xml:"code,attr"`
 }
 
@@ -733,7 +733,7 @@ func (t *AmpComponentDataType) UnmarshalXML(d *xml.Decoder, start xml.StartEleme
 
 type AmpComponentFamhpType struct {
 	PharmaceuticalFormCode    []String10Type                `xml:"urn:be:fgov:ehealth:samws:v2:core PharmaceuticalFormCode"`
-	RouteOfAdministrationCode []String10Type                `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCode"`
+	RouteOfAdministrationCode []String10Type                `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCodes"`
 	RealActualIngredient      []AddRealActualIngredientType `xml:"urn:be:fgov:ehealth:samws:v2:actual:common RealActualIngredient"`
 	SequenceNr                int                           `xml:"sequenceNr,attr"`
 }
@@ -1130,7 +1130,7 @@ type ChangeAmpComponentBcpiType struct {
 
 type ChangeAmpComponentFamhpType struct {
 	PharmaceuticalFormCode    []String10Type                   `xml:"urn:be:fgov:ehealth:samws:v2:core PharmaceuticalFormCode"`
-	RouteOfAdministrationCode []String10Type                   `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCode"`
+	RouteOfAdministrationCode []String10Type                   `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCodes"`
 	RealActualIngredient      []ChangeRealActualIngredientType `xml:"urn:be:fgov:ehealth:samws:v2:actual:common RealActualIngredient,omitempty"`
 	Action                    ChangeNoChangeActionType         `xml:"action,attr"`
 	From                      ValidityDateType                 `xml:"from,attr,omitempty"`
@@ -1465,7 +1465,7 @@ type ChangeVmpComponentType struct {
 	PhaseNumber               int                           `xml:"urn:be:fgov:ehealth:samws:v2:core PhaseNumber,omitempty"`
 	Name                      Text255Type                   `xml:"urn:be:fgov:ehealth:samws:v2:core Name"`
 	VirtualFormCode           String10Type                  `xml:"urn:be:fgov:ehealth:samws:v2:core VirtualFormCode"`
-	RouteOfAdministrationCode []String10Type                `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCode"`
+	RouteOfAdministrationCode []String10Type                `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCodes"`
 	VirtualIngredient         []ChangeVirtualIngredientType `xml:"urn:be:fgov:ehealth:samws:v2:virtual:common VirtualIngredient,omitempty"`
 	Action                    ChangeNoChangeActionType      `xml:"action,attr"`
 	Code                      int                           `xml:"code,attr"`
@@ -4624,14 +4624,14 @@ type GetVtmResponseType struct {
 type HasActualComponentWithType struct {
 	PharmaceuticalFormCode    StandardFormCodeCriterionType  `xml:"urn:be:fgov:ehealth:samws:v2:consultation PharmaceuticalFormCode"`
 	PharmaceuticalFormName    StandardFormNameCriterionType  `xml:"urn:be:fgov:ehealth:samws:v2:consultation PharmaceuticalFormName"`
-	RouteOfAdministrationCode StandardRouteCodeCriterionType `xml:"urn:be:fgov:ehealth:samws:v2:consultation RouteOfAdministrationCode"`
+	RouteOfAdministrationCode StandardRouteCodeCriterionType `xml:"urn:be:fgov:ehealth:samws:v2:consultation RouteOfAdministrationCodes"`
 	RouteOfAdministrationName StandardRouteNameCriterionType `xml:"urn:be:fgov:ehealth:samws:v2:consultation RouteOfAdministrationName"`
 }
 
 type HasVirtualComponentWithType struct {
 	VirtualFormCode           StandardFormCodeCriterionType  `xml:"urn:be:fgov:ehealth:samws:v2:consultation VirtualFormCode"`
 	VirtualFormName           StandardFormNameCriterionType  `xml:"urn:be:fgov:ehealth:samws:v2:consultation VirtualFormName"`
-	RouteOfAdministrationCode StandardRouteCodeCriterionType `xml:"urn:be:fgov:ehealth:samws:v2:consultation RouteOfAdministrationCode"`
+	RouteOfAdministrationCode StandardRouteCodeCriterionType `xml:"urn:be:fgov:ehealth:samws:v2:consultation RouteOfAdministrationCodes"`
 	RouteOfAdministrationName StandardRouteNameCriterionType `xml:"urn:be:fgov:ehealth:samws:v2:consultation RouteOfAdministrationName"`
 }
 
@@ -6387,7 +6387,7 @@ type StandardDosageType struct {
 	TargetGroup                    TargetGroup                  `xml:"urn:be:fgov:ehealth:samws:v2:virtual:common TargetGroup"`
 	KidneyFailureClass             int                          `xml:"urn:be:fgov:ehealth:samws:v2:virtual:common KidneyFailureClass,omitempty"`
 	LiverFailureClass              int                          `xml:"urn:be:fgov:ehealth:samws:v2:virtual:common LiverFailureClass,omitempty"`
-	RouteOfAdministrationCode      []String10Type               `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCode"`
+	RouteOfAdministrationCode      []String10Type               `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCodes"`
 	RouteSpecification             Text255Type                  `xml:"urn:be:fgov:ehealth:samws:v2:core RouteSpecification,omitempty"`
 	TreatmentDurationType          TreatmentDurationType        `xml:"urn:be:fgov:ehealth:samws:v2:virtual:common TreatmentDurationType"`
 	TemporaryDurationDetails       TemporaryDurationDetailsType `xml:"urn:be:fgov:ehealth:samws:v2:virtual:common TemporaryDurationDetails,omitempty"`
@@ -7349,7 +7349,7 @@ type VmpComponentType struct {
 	PhaseNumber               int            `xml:"urn:be:fgov:ehealth:samws:v2:core PhaseNumber,omitempty"`
 	Name                      Text255Type    `xml:"urn:be:fgov:ehealth:samws:v2:core Name"`
 	VirtualFormCode           String10Type   `xml:"urn:be:fgov:ehealth:samws:v2:core VirtualFormCode"`
-	RouteOfAdministrationCode []String10Type `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCode"`
+	RouteOfAdministrationCode []String10Type `xml:"urn:be:fgov:ehealth:samws:v2:core RouteOfAdministrationCodes"`
 	Code                      int            `xml:"code,attr"`
 }
 

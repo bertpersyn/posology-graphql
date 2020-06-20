@@ -43,6 +43,11 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	Dosage struct {
+		Period   func(childComplexity int) int
+		Strength func(childComplexity int) int
+	}
+
 	Ingredient struct {
 		From               func(childComplexity int) int
 		PharmaceuticalForm func(childComplexity int) int
@@ -51,10 +56,14 @@ type ComplexityRoot struct {
 	}
 
 	Medicine struct {
-		Code          func(childComplexity int) int
-		Ingredient    func(childComplexity int) int
-		Name          func(childComplexity int) int
-		PosologyNotes func(childComplexity int) int
+		Code       func(childComplexity int) int
+		Ingredient func(childComplexity int) int
+		Name       func(childComplexity int) int
+	}
+
+	Period struct {
+		Cron  func(childComplexity int) int
+		Value func(childComplexity int) int
 	}
 
 	PharmaceuticalForm struct {
@@ -62,9 +71,15 @@ type ComplexityRoot struct {
 		Name func(childComplexity int) int
 	}
 
+	Posology struct {
+		Dosage func(childComplexity int) int
+		Note   func(childComplexity int) int
+	}
+
 	Query struct {
 		Medicines  func(childComplexity int) int
-		Search     func(childComplexity int, filter *model.Filter) int
+		Posology   func(childComplexity int, medicineCode string, calcRequest []*model.CalcArg) int
+		Search     func(childComplexity int, searchTerm string) int
 		Substances func(childComplexity int) int
 	}
 
@@ -82,7 +97,8 @@ type ComplexityRoot struct {
 type QueryResolver interface {
 	Medicines(ctx context.Context) ([]*model.Medicine, error)
 	Substances(ctx context.Context) ([]*model.Substance, error)
-	Search(ctx context.Context, filter *model.Filter) ([]*model.Medicine, error)
+	Search(ctx context.Context, searchTerm string) ([]*model.Medicine, error)
+	Posology(ctx context.Context, medicineCode string, calcRequest []*model.CalcArg) (*model.Posology, error)
 }
 
 type executableSchema struct {
@@ -99,6 +115,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 	ec := executionContext{nil, e}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "Dosage.period":
+		if e.complexity.Dosage.Period == nil {
+			break
+		}
+
+		return e.complexity.Dosage.Period(childComplexity), true
+
+	case "Dosage.strength":
+		if e.complexity.Dosage.Strength == nil {
+			break
+		}
+
+		return e.complexity.Dosage.Strength(childComplexity), true
 
 	case "Ingredient.from":
 		if e.complexity.Ingredient.From == nil {
@@ -149,12 +179,19 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Medicine.Name(childComplexity), true
 
-	case "Medicine.posologyNotes":
-		if e.complexity.Medicine.PosologyNotes == nil {
+	case "Period.cron":
+		if e.complexity.Period.Cron == nil {
 			break
 		}
 
-		return e.complexity.Medicine.PosologyNotes(childComplexity), true
+		return e.complexity.Period.Cron(childComplexity), true
+
+	case "Period.value":
+		if e.complexity.Period.Value == nil {
+			break
+		}
+
+		return e.complexity.Period.Value(childComplexity), true
 
 	case "PharmaceuticalForm.code":
 		if e.complexity.PharmaceuticalForm.Code == nil {
@@ -170,12 +207,38 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.PharmaceuticalForm.Name(childComplexity), true
 
+	case "Posology.dosage":
+		if e.complexity.Posology.Dosage == nil {
+			break
+		}
+
+		return e.complexity.Posology.Dosage(childComplexity), true
+
+	case "Posology.note":
+		if e.complexity.Posology.Note == nil {
+			break
+		}
+
+		return e.complexity.Posology.Note(childComplexity), true
+
 	case "Query.medicines":
 		if e.complexity.Query.Medicines == nil {
 			break
 		}
 
 		return e.complexity.Query.Medicines(childComplexity), true
+
+	case "Query.posology":
+		if e.complexity.Query.Posology == nil {
+			break
+		}
+
+		args, err := ec.field_Query_posology_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.Posology(childComplexity, args["medicineCode"].(string), args["calcRequest"].([]*model.CalcArg)), true
 
 	case "Query.search":
 		if e.complexity.Query.Search == nil {
@@ -187,7 +250,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Query.Search(childComplexity, args["filter"].(*model.Filter)), true
+		return e.complexity.Query.Search(childComplexity, args["searchTerm"].(string)), true
 
 	case "Query.substances":
 		if e.complexity.Query.Substances == nil {
@@ -283,7 +346,6 @@ type Medicine {
   code: ID!
   name: String!
   ingredient: Ingredient!
-  posologyNotes: [String!]
 }
 
 type Ingredient {
@@ -306,15 +368,31 @@ type PharmaceuticalForm {
   name: String!
 }
 
+type Dosage {
+  strength: Strength!
+  period: Period!
+}
+
+type Period {
+  value: Float!
+  cron: String!
+}
+
+type Posology {
+  note: String!
+  dosage: Dosage!
+}
+
+input CalcArg {
+  name: String!
+  value: String!
+}
+
 type Query {
   medicines: [Medicine!]!
   substances: [Substance!]!
-  search(filter: Filter) : [Medicine!]
-}
-
-input Filter {
-  name: String
-  substance: String
+  search(searchTerm: String!) : [Medicine!]
+  posology(medicineCode: String!, calcRequest: [CalcArg!]!) : Posology
 }
 
 scalar Time`, BuiltIn: false},
@@ -339,17 +417,39 @@ func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs
 	return args, nil
 }
 
-func (ec *executionContext) field_Query_search_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+func (ec *executionContext) field_Query_posology_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
 	args := map[string]interface{}{}
-	var arg0 *model.Filter
-	if tmp, ok := rawArgs["filter"]; ok {
-		arg0, err = ec.unmarshalOFilter2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐFilter(ctx, tmp)
+	var arg0 string
+	if tmp, ok := rawArgs["medicineCode"]; ok {
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
 	}
-	args["filter"] = arg0
+	args["medicineCode"] = arg0
+	var arg1 []*model.CalcArg
+	if tmp, ok := rawArgs["calcRequest"]; ok {
+		arg1, err = ec.unmarshalNCalcArg2ᚕᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐCalcArgᚄ(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["calcRequest"] = arg1
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_search_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 string
+	if tmp, ok := rawArgs["searchTerm"]; ok {
+		arg0, err = ec.unmarshalNString2string(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["searchTerm"] = arg0
 	return args, nil
 }
 
@@ -389,6 +489,74 @@ func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArg
 
 // region    **************************** field.gotpl *****************************
 
+func (ec *executionContext) _Dosage_strength(ctx context.Context, field graphql.CollectedField, obj *model.Dosage) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Dosage",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Strength, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Strength)
+	fc.Result = res
+	return ec.marshalNStrength2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐStrength(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Dosage_period(ctx context.Context, field graphql.CollectedField, obj *model.Dosage) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Dosage",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Period, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Period)
+	fc.Result = res
+	return ec.marshalNPeriod2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPeriod(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Ingredient_pharmaceuticalForm(ctx context.Context, field graphql.CollectedField, obj *model.Ingredient) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -420,7 +588,7 @@ func (ec *executionContext) _Ingredient_pharmaceuticalForm(ctx context.Context, 
 	}
 	res := resTmp.(*model.PharmaceuticalForm)
 	fc.Result = res
-	return ec.marshalNPharmaceuticalForm2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPharmaceuticalForm(ctx, field.Selections, res)
+	return ec.marshalNPharmaceuticalForm2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPharmaceuticalForm(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Ingredient_from(ctx context.Context, field graphql.CollectedField, obj *model.Ingredient) (ret graphql.Marshaler) {
@@ -488,7 +656,7 @@ func (ec *executionContext) _Ingredient_substance(ctx context.Context, field gra
 	}
 	res := resTmp.(*model.Substance)
 	fc.Result = res
-	return ec.marshalNSubstance2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstance(ctx, field.Selections, res)
+	return ec.marshalNSubstance2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstance(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Ingredient_strength(ctx context.Context, field graphql.CollectedField, obj *model.Ingredient) (ret graphql.Marshaler) {
@@ -522,7 +690,7 @@ func (ec *executionContext) _Ingredient_strength(ctx context.Context, field grap
 	}
 	res := resTmp.(*model.Strength)
 	fc.Result = res
-	return ec.marshalNStrength2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐStrength(ctx, field.Selections, res)
+	return ec.marshalNStrength2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐStrength(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Medicine_code(ctx context.Context, field graphql.CollectedField, obj *model.Medicine) (ret graphql.Marshaler) {
@@ -624,10 +792,10 @@ func (ec *executionContext) _Medicine_ingredient(ctx context.Context, field grap
 	}
 	res := resTmp.(*model.Ingredient)
 	fc.Result = res
-	return ec.marshalNIngredient2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐIngredient(ctx, field.Selections, res)
+	return ec.marshalNIngredient2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐIngredient(ctx, field.Selections, res)
 }
 
-func (ec *executionContext) _Medicine_posologyNotes(ctx context.Context, field graphql.CollectedField, obj *model.Medicine) (ret graphql.Marshaler) {
+func (ec *executionContext) _Period_value(ctx context.Context, field graphql.CollectedField, obj *model.Period) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
 			ec.Error(ctx, ec.Recover(ctx, r))
@@ -635,7 +803,7 @@ func (ec *executionContext) _Medicine_posologyNotes(ctx context.Context, field g
 		}
 	}()
 	fc := &graphql.FieldContext{
-		Object:   "Medicine",
+		Object:   "Period",
 		Field:    field,
 		Args:     nil,
 		IsMethod: false,
@@ -644,18 +812,55 @@ func (ec *executionContext) _Medicine_posologyNotes(ctx context.Context, field g
 	ctx = graphql.WithFieldContext(ctx, fc)
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.PosologyNotes, nil
+		return obj.Value, nil
 	})
 	if err != nil {
 		ec.Error(ctx, err)
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
-	res := resTmp.([]string)
+	res := resTmp.(float64)
 	fc.Result = res
-	return ec.marshalOString2ᚕstringᚄ(ctx, field.Selections, res)
+	return ec.marshalNFloat2float64(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Period_cron(ctx context.Context, field graphql.CollectedField, obj *model.Period) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Period",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cron, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _PharmaceuticalForm_code(ctx context.Context, field graphql.CollectedField, obj *model.PharmaceuticalForm) (ret graphql.Marshaler) {
@@ -726,6 +931,74 @@ func (ec *executionContext) _PharmaceuticalForm_name(ctx context.Context, field 
 	return ec.marshalNString2string(ctx, field.Selections, res)
 }
 
+func (ec *executionContext) _Posology_note(ctx context.Context, field graphql.CollectedField, obj *model.Posology) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Posology",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Note, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Posology_dosage(ctx context.Context, field graphql.CollectedField, obj *model.Posology) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Posology",
+		Field:    field,
+		Args:     nil,
+		IsMethod: false,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Dosage, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*model.Dosage)
+	fc.Result = res
+	return ec.marshalNDosage2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐDosage(ctx, field.Selections, res)
+}
+
 func (ec *executionContext) _Query_medicines(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -757,7 +1030,7 @@ func (ec *executionContext) _Query_medicines(ctx context.Context, field graphql.
 	}
 	res := resTmp.([]*model.Medicine)
 	fc.Result = res
-	return ec.marshalNMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicineᚄ(ctx, field.Selections, res)
+	return ec.marshalNMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicineᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_substances(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -791,7 +1064,7 @@ func (ec *executionContext) _Query_substances(ctx context.Context, field graphql
 	}
 	res := resTmp.([]*model.Substance)
 	fc.Result = res
-	return ec.marshalNSubstance2ᚕᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstanceᚄ(ctx, field.Selections, res)
+	return ec.marshalNSubstance2ᚕᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstanceᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query_search(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -818,7 +1091,7 @@ func (ec *executionContext) _Query_search(ctx context.Context, field graphql.Col
 	fc.Args = args
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().Search(rctx, args["filter"].(*model.Filter))
+		return ec.resolvers.Query().Search(rctx, args["searchTerm"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -829,7 +1102,45 @@ func (ec *executionContext) _Query_search(ctx context.Context, field graphql.Col
 	}
 	res := resTmp.([]*model.Medicine)
 	fc.Result = res
-	return ec.marshalOMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicineᚄ(ctx, field.Selections, res)
+	return ec.marshalOMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicineᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) _Query_posology(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	fc := &graphql.FieldContext{
+		Object:   "Query",
+		Field:    field,
+		Args:     nil,
+		IsMethod: true,
+	}
+
+	ctx = graphql.WithFieldContext(ctx, fc)
+	rawArgs := field.ArgumentMap(ec.Variables)
+	args, err := ec.field_Query_posology_args(ctx, rawArgs)
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	fc.Args = args
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().Posology(rctx, args["medicineCode"].(string), args["calcRequest"].([]*model.CalcArg))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*model.Posology)
+	fc.Result = res
+	return ec.marshalOPosology2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPosology(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
@@ -2092,21 +2403,21 @@ func (ec *executionContext) ___Type_ofType(ctx context.Context, field graphql.Co
 
 // region    **************************** input.gotpl *****************************
 
-func (ec *executionContext) unmarshalInputFilter(ctx context.Context, obj interface{}) (model.Filter, error) {
-	var it model.Filter
+func (ec *executionContext) unmarshalInputCalcArg(ctx context.Context, obj interface{}) (model.CalcArg, error) {
+	var it model.CalcArg
 	var asMap = obj.(map[string]interface{})
 
 	for k, v := range asMap {
 		switch k {
 		case "name":
 			var err error
-			it.Name, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			it.Name, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-		case "substance":
+		case "value":
 			var err error
-			it.Substance, err = ec.unmarshalOString2ᚖstring(ctx, v)
+			it.Value, err = ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
@@ -2123,6 +2434,38 @@ func (ec *executionContext) unmarshalInputFilter(ctx context.Context, obj interf
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
+
+var dosageImplementors = []string{"Dosage"}
+
+func (ec *executionContext) _Dosage(ctx context.Context, sel ast.SelectionSet, obj *model.Dosage) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, dosageImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Dosage")
+		case "strength":
+			out.Values[i] = ec._Dosage_strength(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "period":
+			out.Values[i] = ec._Dosage_period(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
 
 var ingredientImplementors = []string{"Ingredient"}
 
@@ -2192,8 +2535,38 @@ func (ec *executionContext) _Medicine(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
-		case "posologyNotes":
-			out.Values[i] = ec._Medicine_posologyNotes(ctx, field, obj)
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var periodImplementors = []string{"Period"}
+
+func (ec *executionContext) _Period(ctx context.Context, sel ast.SelectionSet, obj *model.Period) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, periodImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Period")
+		case "value":
+			out.Values[i] = ec._Period_value(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "cron":
+			out.Values[i] = ec._Period_cron(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -2223,6 +2596,38 @@ func (ec *executionContext) _PharmaceuticalForm(ctx context.Context, sel ast.Sel
 			}
 		case "name":
 			out.Values[i] = ec._PharmaceuticalForm_name(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var posologyImplementors = []string{"Posology"}
+
+func (ec *executionContext) _Posology(ctx context.Context, sel ast.SelectionSet, obj *model.Posology) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, posologyImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Posology")
+		case "note":
+			out.Values[i] = ec._Posology_note(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "dosage":
+			out.Values[i] = ec._Posology_dosage(ctx, field, obj)
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
@@ -2289,6 +2694,17 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_search(ctx, field)
+				return res
+			})
+		case "posology":
+			field := field
+			out.Concurrently(i, func() (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_posology(ctx, field)
 				return res
 			})
 		case "__type":
@@ -2629,6 +3045,52 @@ func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.Se
 	return res
 }
 
+func (ec *executionContext) unmarshalNCalcArg2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐCalcArg(ctx context.Context, v interface{}) (model.CalcArg, error) {
+	return ec.unmarshalInputCalcArg(ctx, v)
+}
+
+func (ec *executionContext) unmarshalNCalcArg2ᚕᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐCalcArgᚄ(ctx context.Context, v interface{}) ([]*model.CalcArg, error) {
+	var vSlice []interface{}
+	if v != nil {
+		if tmp1, ok := v.([]interface{}); ok {
+			vSlice = tmp1
+		} else {
+			vSlice = []interface{}{v}
+		}
+	}
+	var err error
+	res := make([]*model.CalcArg, len(vSlice))
+	for i := range vSlice {
+		res[i], err = ec.unmarshalNCalcArg2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐCalcArg(ctx, vSlice[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return res, nil
+}
+
+func (ec *executionContext) unmarshalNCalcArg2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐCalcArg(ctx context.Context, v interface{}) (*model.CalcArg, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := ec.unmarshalNCalcArg2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐCalcArg(ctx, v)
+	return &res, err
+}
+
+func (ec *executionContext) marshalNDosage2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐDosage(ctx context.Context, sel ast.SelectionSet, v model.Dosage) graphql.Marshaler {
+	return ec._Dosage(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNDosage2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐDosage(ctx context.Context, sel ast.SelectionSet, v *model.Dosage) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Dosage(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNFloat2float64(ctx context.Context, v interface{}) (float64, error) {
 	return graphql.UnmarshalFloat(v)
 }
@@ -2657,11 +3119,11 @@ func (ec *executionContext) marshalNID2string(ctx context.Context, sel ast.Selec
 	return res
 }
 
-func (ec *executionContext) marshalNIngredient2githubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐIngredient(ctx context.Context, sel ast.SelectionSet, v model.Ingredient) graphql.Marshaler {
+func (ec *executionContext) marshalNIngredient2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐIngredient(ctx context.Context, sel ast.SelectionSet, v model.Ingredient) graphql.Marshaler {
 	return ec._Ingredient(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNIngredient2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐIngredient(ctx context.Context, sel ast.SelectionSet, v *model.Ingredient) graphql.Marshaler {
+func (ec *executionContext) marshalNIngredient2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐIngredient(ctx context.Context, sel ast.SelectionSet, v *model.Ingredient) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -2671,11 +3133,11 @@ func (ec *executionContext) marshalNIngredient2ᚖgithubᚗcomᚋbertpersynᚋsa
 	return ec._Ingredient(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNMedicine2githubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicine(ctx context.Context, sel ast.SelectionSet, v model.Medicine) graphql.Marshaler {
+func (ec *executionContext) marshalNMedicine2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicine(ctx context.Context, sel ast.SelectionSet, v model.Medicine) graphql.Marshaler {
 	return ec._Medicine(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicineᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Medicine) graphql.Marshaler {
+func (ec *executionContext) marshalNMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicineᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Medicine) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -2699,7 +3161,7 @@ func (ec *executionContext) marshalNMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋs
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNMedicine2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicine(ctx, sel, v[i])
+			ret[i] = ec.marshalNMedicine2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicine(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -2712,7 +3174,7 @@ func (ec *executionContext) marshalNMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋs
 	return ret
 }
 
-func (ec *executionContext) marshalNMedicine2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicine(ctx context.Context, sel ast.SelectionSet, v *model.Medicine) graphql.Marshaler {
+func (ec *executionContext) marshalNMedicine2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicine(ctx context.Context, sel ast.SelectionSet, v *model.Medicine) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -2722,11 +3184,25 @@ func (ec *executionContext) marshalNMedicine2ᚖgithubᚗcomᚋbertpersynᚋsam�
 	return ec._Medicine(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNPharmaceuticalForm2githubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPharmaceuticalForm(ctx context.Context, sel ast.SelectionSet, v model.PharmaceuticalForm) graphql.Marshaler {
+func (ec *executionContext) marshalNPeriod2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPeriod(ctx context.Context, sel ast.SelectionSet, v model.Period) graphql.Marshaler {
+	return ec._Period(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalNPeriod2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPeriod(ctx context.Context, sel ast.SelectionSet, v *model.Period) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	return ec._Period(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNPharmaceuticalForm2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPharmaceuticalForm(ctx context.Context, sel ast.SelectionSet, v model.PharmaceuticalForm) graphql.Marshaler {
 	return ec._PharmaceuticalForm(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNPharmaceuticalForm2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPharmaceuticalForm(ctx context.Context, sel ast.SelectionSet, v *model.PharmaceuticalForm) graphql.Marshaler {
+func (ec *executionContext) marshalNPharmaceuticalForm2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPharmaceuticalForm(ctx context.Context, sel ast.SelectionSet, v *model.PharmaceuticalForm) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -2736,11 +3212,11 @@ func (ec *executionContext) marshalNPharmaceuticalForm2ᚖgithubᚗcomᚋbertper
 	return ec._PharmaceuticalForm(ctx, sel, v)
 }
 
-func (ec *executionContext) marshalNStrength2githubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐStrength(ctx context.Context, sel ast.SelectionSet, v model.Strength) graphql.Marshaler {
+func (ec *executionContext) marshalNStrength2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐStrength(ctx context.Context, sel ast.SelectionSet, v model.Strength) graphql.Marshaler {
 	return ec._Strength(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNStrength2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐStrength(ctx context.Context, sel ast.SelectionSet, v *model.Strength) graphql.Marshaler {
+func (ec *executionContext) marshalNStrength2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐStrength(ctx context.Context, sel ast.SelectionSet, v *model.Strength) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -2764,11 +3240,11 @@ func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.S
 	return res
 }
 
-func (ec *executionContext) marshalNSubstance2githubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstance(ctx context.Context, sel ast.SelectionSet, v model.Substance) graphql.Marshaler {
+func (ec *executionContext) marshalNSubstance2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstance(ctx context.Context, sel ast.SelectionSet, v model.Substance) graphql.Marshaler {
 	return ec._Substance(ctx, sel, &v)
 }
 
-func (ec *executionContext) marshalNSubstance2ᚕᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstanceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Substance) graphql.Marshaler {
+func (ec *executionContext) marshalNSubstance2ᚕᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstanceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Substance) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
 	isLen1 := len(v) == 1
@@ -2792,7 +3268,7 @@ func (ec *executionContext) marshalNSubstance2ᚕᚖgithubᚗcomᚋbertpersynᚋ
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNSubstance2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstance(ctx, sel, v[i])
+			ret[i] = ec.marshalNSubstance2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstance(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -2805,7 +3281,7 @@ func (ec *executionContext) marshalNSubstance2ᚕᚖgithubᚗcomᚋbertpersynᚋ
 	return ret
 }
 
-func (ec *executionContext) marshalNSubstance2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstance(ctx context.Context, sel ast.SelectionSet, v *model.Substance) graphql.Marshaler {
+func (ec *executionContext) marshalNSubstance2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐSubstance(ctx context.Context, sel ast.SelectionSet, v *model.Substance) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
 			ec.Errorf(ctx, "must not be null")
@@ -3078,19 +3554,7 @@ func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast
 	return ec.marshalOBoolean2bool(ctx, sel, *v)
 }
 
-func (ec *executionContext) unmarshalOFilter2githubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐFilter(ctx context.Context, v interface{}) (model.Filter, error) {
-	return ec.unmarshalInputFilter(ctx, v)
-}
-
-func (ec *executionContext) unmarshalOFilter2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐFilter(ctx context.Context, v interface{}) (*model.Filter, error) {
-	if v == nil {
-		return nil, nil
-	}
-	res, err := ec.unmarshalOFilter2githubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐFilter(ctx, v)
-	return &res, err
-}
-
-func (ec *executionContext) marshalOMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicineᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Medicine) graphql.Marshaler {
+func (ec *executionContext) marshalOMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicineᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Medicine) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
 	}
@@ -3117,7 +3581,7 @@ func (ec *executionContext) marshalOMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋs
 			if !isLen1 {
 				defer wg.Done()
 			}
-			ret[i] = ec.marshalNMedicine2ᚖgithubᚗcomᚋbertpersynᚋsamᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicine(ctx, sel, v[i])
+			ret[i] = ec.marshalNMedicine2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐMedicine(ctx, sel, v[i])
 		}
 		if isLen1 {
 			f(i)
@@ -3130,44 +3594,23 @@ func (ec *executionContext) marshalOMedicine2ᚕᚖgithubᚗcomᚋbertpersynᚋs
 	return ret
 }
 
+func (ec *executionContext) marshalOPosology2githubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPosology(ctx context.Context, sel ast.SelectionSet, v model.Posology) graphql.Marshaler {
+	return ec._Posology(ctx, sel, &v)
+}
+
+func (ec *executionContext) marshalOPosology2ᚖgithubᚗcomᚋbertpersynᚋposologyᚑgraphqlᚋinternalᚋgraphqlᚋgraphᚋmodelᚐPosology(ctx context.Context, sel ast.SelectionSet, v *model.Posology) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._Posology(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalOString2string(ctx context.Context, v interface{}) (string, error) {
 	return graphql.UnmarshalString(v)
 }
 
 func (ec *executionContext) marshalOString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler {
 	return graphql.MarshalString(v)
-}
-
-func (ec *executionContext) unmarshalOString2ᚕstringᚄ(ctx context.Context, v interface{}) ([]string, error) {
-	var vSlice []interface{}
-	if v != nil {
-		if tmp1, ok := v.([]interface{}); ok {
-			vSlice = tmp1
-		} else {
-			vSlice = []interface{}{v}
-		}
-	}
-	var err error
-	res := make([]string, len(vSlice))
-	for i := range vSlice {
-		res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
-		if err != nil {
-			return nil, err
-		}
-	}
-	return res, nil
-}
-
-func (ec *executionContext) marshalOString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	for i := range v {
-		ret[i] = ec.marshalNString2string(ctx, sel, v[i])
-	}
-
-	return ret
 }
 
 func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v interface{}) (*string, error) {
