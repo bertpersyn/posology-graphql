@@ -15,6 +15,6 @@ require (
 	github.com/tamerh/xml-stream-parser v1.4.0
 	github.com/tamerh/xpath v1.0.0 // indirect
 	github.com/vektah/gqlparser/v2 v2.0.1
-	golang.org/x/sys v0.0.0-20200223170610-d5e6a3e2c0ae // indirect
+	golang.org/x/sys v0.1.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 )
